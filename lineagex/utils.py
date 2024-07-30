@@ -269,5 +269,27 @@ def load_sql_file(file:str, variables:Optional[dict]={}):
   return replace_variables(sql, variables)
 
 
+def organize_sql_input(inputs:list[str]|str):
+    files = []
+    content = []
+
+    if isinstance(inputs, list):
+        for idx, val in enumerate(inputs):
+            if os.path.exists(val):
+                files = get_files(path=val)
+                files.extend(files)
+            else:
+                content.append(val)
+
+    else:
+        if os.path.exists(inputs):
+            files = get_files(path=inputs)
+            files.extend(files)
+        else:
+          content.append(inputs)
+
+    return files, content
+
+
 if __name__ == "__main__":
     pass

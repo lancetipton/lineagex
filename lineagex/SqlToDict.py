@@ -2,7 +2,7 @@ import os
 import re
 from typing import List, Optional, Union
 
-from .utils import find_select, get_files, remove_comments, load_sql_file
+from .utils import find_select, get_files, remove_comments, load_sql_file, organize_sql_input
 
 rem_regex = re.compile(r"[^a-zA-Z0-9_.]")
 
@@ -18,7 +18,6 @@ class SqlToDict:
         self.path = path
         self.schema_list = schema_list
         self.dialect = dialect
-        self.sql_files = []
         self.sql_files_dict = {}
         self.org_sql_files_dict = {}
         self.deletion_dict = {}
@@ -33,31 +32,34 @@ class SqlToDict:
         The driver function to make the input into the dict format, name of sql:sql
         :return:
         """
-        if isinstance(self.path, list):
-            for idx, val in enumerate(self.path):
-                self._preprocess_sql(new_sql=val, file=str(idx), org_sql=val)
-        else:
-            self.sql_files = get_files(path=self.path)
-            for f in self.sql_files:
-                org_sql = load_sql_file(f, self.variables)
-                new_sql = remove_comments(str1=org_sql)
-                org_sql_split = list(filter(None, new_sql.split(";")))
-                # pop DROP IF EXISTS
-                if len(org_sql_split) > 0:
-                    for s in org_sql_split:
-                        temp_str = s.upper()
-                        if temp_str.find("SELECT ") == -1 and (
-                            temp_str.startswith("DROP TABLE IF EXISTS")
-                            or temp_str.startswith("DROP VIEW IF EXISTS")
-                        ):
-                            org_sql_split.pop(org_sql_split.index(s))
-                if f.endswith(".sql") or f.endswith(".SQL"):
-                    f = os.path.basename(f)[:-4]
-                if len(org_sql_split) <= 1:
-                    self._preprocess_sql(new_sql=org_sql_split[0], file=f, org_sql=org_sql)
-                else:
-                    for idx, val in enumerate(org_sql_split):
-                        self._preprocess_sql(new_sql=val, file=f + "_" + str(idx), org_sql=org_sql)
+
+        files, content = organize_sql_input(self.path)
+
+        for idx, c in enumerate(content):
+          self._preprocess_sql(new_sql=c, file=str(idx), org_sql=c)
+
+        for f in files:
+            org_sql = load_sql_file(f, self.variables)
+            new_sql = remove_comments(str1=org_sql)
+            org_sql_split = list(filter(None, new_sql.split(";")))
+            # pop DROP IF EXISTS
+            if len(org_sql_split) > 0:
+                for s in org_sql_split:
+                    temp_str = s.upper()
+                    if temp_str.find("SELECT ") == -1 and (
+                        temp_str.startswith("DROP TABLE IF EXISTS")
+                        or temp_str.startswith("DROP VIEW IF EXISTS")
+                    ):
+                        org_sql_split.pop(org_sql_split.index(s))
+            if f.endswith(".sql") or f.endswith(".SQL"):
+                f = os.path.basename(f)[:-4]
+            if len(org_sql_split) <= 1:
+                if len(org_sql_split) == 1:
+                  self._preprocess_sql(new_sql=org_sql_split[0], file=f, org_sql=org_sql)
+            else:
+                for idx, val in enumerate(org_sql_split):
+                    self._preprocess_sql(new_sql=val, file=f + "_" + str(idx), org_sql=org_sql)
+
         for key, value in self.sql_files_dict.copy().items():
             if key.startswith("."):
                 self.sql_files_dict[key[1:]] = value
